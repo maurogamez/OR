@@ -45,14 +45,12 @@ typedef IloArray<NumVar3DMatrix> NumVar4DMatrix;	//4D array of Num Var
 typedef IloArray<IloRangeArray> Range2DMatrix;		//2D Arrays of Ranges
 
 
-
 #define MAX INT_MAX
-#define RC_EPS 1.0e-6
-#define RC_EPS 1.0e-6		//if shadow_price or Reduced Cost < RC_EPS, treat it as 0
+#define RC_EPS 1.0e-2		//if shadow_price or Reduced Cost < RC_EPS, treat it as 0
 #define INF (0x7FFFFFFF)
 #define verbose (1)
 #define NUM_SOLUTIONS 100
-#define TOL 0.00001			/*define tolerance level to check improving obj value*/
+#define TOL 0.01			/*define tolerance level to check improving obj value*/
 #define LN 99999999.0		/* Large number */
 #define SETSIZE 50
 #define feasibility (RC_EPS*LN)
@@ -90,7 +88,8 @@ public:
     double upperbound;
     double dual[100];
 	int xcolumnindices [100],ycolumnindices[100];				//indices of variables in basis
-	int numxinclude, xinclude[100],numxexclude, xexclude[100];	//xinclude: actual column included, xexclude: indices of the columns excluded
+	int numxinclude,numxexclude, xexclude[100];					// xexclude: indices of the columns excluded
+	IloNum xinclude[100];										//xinclude: actual column included
 	int numyinclude,yinclude[100],numyexclude,yexclude[100];	//indices of variables to be included or excluded
 	int is_xincluded;
 	
@@ -132,8 +131,8 @@ static void sort(IloEnv env, Num2DMatrix Unsorted_matrix, Num2DMatrix& Sorted_ar
 static void report1 (IloCplex& cplex_master, IloNumVarArray Col_select, IloRangeArray Constraint_master, vector <int> Column_index_r, vector <int> Column_index_j, int Num_source, int Num_destination, int Num_idoors, int Num_odoors);
 static void report2 (IloAlgorithm& cplex_sub, IloNumArray newCol_val, IloObjective Objective_sub);
 static void report3 (IloCplex& cplex_master, IloNumVarArray Col_select);
-static void gen_col_matrix(Num2DMatrix comb, int Num_source, int Num_destination, Num2DMatrix SI, Num2DMatrix RJ, Num2DMatrix IJ, Num2DMatrix flow_des_sort, Num2DMatrix distance_des_sort, Num2DMatrix Col_Matrix);
-static void gen_cols(Num2DMatrix comb, int Num_source, int Num_destination, Num2DMatrix SI, Num2DMatrix RJ, Num2DMatrix IJ, Num2DMatrix flow_des_sort, Num2DMatrix distance_des_sort, Num2DMatrix Col_Matrix);
+static void gen_col_matrix(Num2DMatrix comb, int Num_source, int Num_destination, Int2DMatrix SI, Int2DMatrix RJ, Int2DMatrix IJ, Num2DMatrix flow_des_sort, Num2DMatrix distance_des_sort, Num2DMatrix Col_Matrix);
+static void gen_cols(Num2DMatrix comb, int Num_source, int Num_destination, Int2DMatrix SI, Int2DMatrix RJ, Int2DMatrix IJ, Num2DMatrix flow_des_sort, Num2DMatrix distance_des_sort, Num2DMatrix Col_Matrix);
 void Millers_Code(int S, int R, Num2DMatrix kbestsols, IloNumArray koptvals, IloNumArray shadow_price);
 
 /*GLOBAL VARIABLE DECLARATIONS*/
@@ -142,11 +141,13 @@ double ycolumns_semiassignment[30][30];
 int basissize, numycolumns, numnodegen, numnodeactive;
 double upperbound, lowerbound;
 
-int S ;	//STORES TOTAL NUMBER OF SUPPLIERS
-int R ;	//STORES TOTAL NUMBER OF RETAILERS
-int N ;	//STORES TOTAL NUMBER OF OUTBOUND DOORS
-int M ;	//STORES TOTAL NUMBER OF INBOUND DOORS
-
+/*
+const int S=4;	//STORES TOTAL NUMBER OF SUPPLIERS
+const int R=3;	//STORES TOTAL NUMBER OF RETAILERS
+const int N=3;	//STORES TOTAL NUMBER OF OUTBOUND DOORS
+const int M=4;	//STORES TOTAL NUMBER OF INBOUND DOORS
+*/
+int S=3, R=2, M=3, N=2;
 int i,s;
 
 IloModel model_master(env);
@@ -223,11 +224,11 @@ int main(int argc, char **argv)
 
 		cout<<flow<<endl;
 		cout<<dist<<endl;
-
-		S = flow.getSize();
-		R = flow[0].getSize();
-		M = dist.getSize();
-		N = dist[0].getSize();
+		//S=4;
+		/*S = 4;//flow.getSize();
+		R = 3;//flow[0].getSize();
+		M = 4;//dist.getSize();
+		N = 3;//dist[0].getSize();*/
 
 		cout<<"No. of Sources = "<<S<<endl;
 		cout<<"No. of Destinations = "<<R<<endl;
@@ -266,9 +267,9 @@ int main(int argc, char **argv)
 			}
 
 			// b. SI matrix
-			Num2DMatrix SI(env, S);
+			Int2DMatrix SI(env, S);
 			for(int s=0; s<S; s++){
-				SI[s] = IloNumArray(env,2);
+				SI[s] = IloIntArray(env,2);
 			}
 			// Initialize each element of SI matrix with -100
 			for(int s=0; s<S; s++){
@@ -278,9 +279,9 @@ int main(int argc, char **argv)
 			}
 			
 			// c. RJ matrix
-			Num2DMatrix RJ(env, R);
+			Int2DMatrix RJ(env, R);
 			for(int r=0; r<R; r++){
-				RJ[r] = IloNumArray(env,2);
+				RJ[r] = IloIntArray(env,2);
 			}
 			for(int r=0; r<R; r++){
 				for(int col=0; col<2; col++){
@@ -289,10 +290,10 @@ int main(int argc, char **argv)
 			}
 			cout<<"\nI'm at ij"<<endl;
 			// d. IJ matrix						/*---------------------New Addition here------------------------------------*/
-			Num2DMatrix IJ(env, M);
+			Int2DMatrix IJ(env, M);
 			for(int i=0; i<M;i++)
 			{
-				IJ[i] = IloNumArray(env,2);
+				IJ[i] = IloIntArray(env,2);
 			}
 			for(int i=0; i<M; i++){
 				for(int col=0; col<2; col++){
@@ -311,7 +312,7 @@ int main(int argc, char **argv)
 				gen_cols(comb, S, R, SI, RJ, IJ, flow_des_sort, distance_des_sort, Col_Matrix);
 				
 		// (iii)Set initial objective function values to the Col_Matrix columns
-				int s1,m1,n1,r1;
+				IloInt s1,m1,n1,r1;
 				for(int j=0;j<Col_Matrix[0].getSize()-1;j++)
 				{
 					obj_init[j]=0;
@@ -382,7 +383,7 @@ int main(int argc, char **argv)
 		  for (int i=0; i<M; i++)
 		  {
 			  UB_master_constraint[R+s*S+i] = 0;
-			  LB_master_constraint[R+s*S+i] = -IloInfinity;
+			  LB_master_constraint[R+s*S+i] = -MAX;
 		  }
 	  }
 
@@ -549,7 +550,13 @@ int main(int argc, char **argv)
 	  //system("pause");
 	  
 /*---------------------------------------------SOME INITIAL DECLARATIONS FOR YCOLUMN - END -------------------------------------*/
-	  
+		cplex_master.setParam(IloCplex::EpOpt, 1e-2);
+		cplex_master.setParam(IloCplex::EpAGap, 1e-2);
+		cplex_master.setParam(IloCplex::EpGap, 1e-2);
+		cplex_master.setParam(IloCplex::EpInt, 1e-2);
+		cplex_master.setParam(IloCplex::EpRelax, 1e-2);
+		//cout<<cplex_master.getParam(IloCplex::EpOpt)<<endl;
+		system("pause");
 		cplex_master.extract(model_master);		//Read master problem
 		solve(cplex_master);				
 		if(res==0)				//If relaxed master problem is infeasible then original problem is infeasible
@@ -559,13 +566,16 @@ int main(int argc, char **argv)
 		}
 
 		cplex_master.exportModel("master.lp");
-		report1 (cplex_master, Col_select, Constraint_master, Column_index_r, Column_index_j, S, R, M, N);
+		cplex_master.getValues(vals,Col_select); //Copy values of solution vector
+		cout<<"Solution value: "<<cplex_master.getObjValue()<<endl;
+		cout<<"Solution vector: "<<vals<<endl;
+		//report1 (cplex_master, Col_select, Constraint_master, Column_index_r, Column_index_j, S, R, M, N);
 		cout<<"\n\nSolved relaxed lp once completely!\n"<<endl;
 		cout<<"Start Branching"<<endl;
-		
+		cout<<"Iter:S,M,N,R"<<S<<":"<<M<<":"<<N<<":"<<R<<endl;
 		/*------------------------------------------------------Branch and bound-----------------------------------------------------*/
 		system("pause");
-		cplex_master.getValues(vals,Col_select);	//Copy values of solution vector
+			
 		if(vals.areElementsInteger())				//Are the values in the solution vector integral
 		{
 			env.out()<<"Relaxed LP gives integral solution"<<endl;
@@ -581,6 +591,7 @@ int main(int argc, char **argv)
 		
 		eps = cplex_master.getParam(IloCplex::EpInt);	//Take epsilon value from cplex
 		
+		//return 0;
 		/*Queue of problems*/
 		queue<IloModel> mod;		//Create a queue of models
 		mod.push(model_master);		//Push the master problem
@@ -678,10 +689,10 @@ void solve(IloCplex &cplex_master)
 					//cout<<"Iter::r,n,N: "<<r<<","<<j<<","<<N<<endl;
 					cout<<S<<":"<<M<<":"<<N<<":"<<R<<":"<<r<<":"<<j<<":";//<<dist<<":"<<reduced_cost_y_column<<endl;
 					//system("pause");
-					S=4;
-					M=4;
-					N = 3;
-					R=3;
+					//S=4;
+					//M=4;
+					//N=3;
+					//R=3;
 					//system("pause");
 					generateycolumn(nodenum, S, M, N, R, r, j, dist, reduced_cost_y_column);
 					//cout<<"Iter: "<<S<<":"<<M<<":"<<N<<":"<<R<<":"<<r<<":"<<j<<":";
@@ -691,9 +702,9 @@ void solve(IloCplex &cplex_master)
 					// Reading values of ycolumn[][] into ycolumns_val[] to add to restricted master problem
 					int y_node_output = 0; // r-j semi-assignment solution number(p) for (p+1)th best
 				  
-					for(int r=0; r<shadow_price.getSize(); r++)
+					for(int r1=0; r1<shadow_price.getSize(); r1++)
 					{
-						ycolumns_val[r] = ycolumns_semiassignment[r+1][y_node_output+1];
+						ycolumns_val[r1] = ycolumns_semiassignment[r1+1][y_node_output+1];
 					}
 				  
 					IloNum current_sub_red_cost = -reduced_cost_y_column[y_node_output+1];;
@@ -731,8 +742,8 @@ void solve(IloCplex &cplex_master)
 		  //system("pause");
 		  /// FIND AND ADD A NEW X COLUMN WITH NEGATIVE REDUCED COST ///
 		  // 1. Declare 2D Array, 2D Result Matrix and reduced cost place holder that will go as an input to hungarian
-		  double node_number = 0.0;				//kth best
-		  
+		  //double node_number = 0.0;				//kth best
+		  IloInt node_number = 0;					//kth best
 		  if(nodenum!=0)
 		  {
 			  cout<<"k-best: "<<node_number<<endl;
@@ -847,7 +858,7 @@ void solve(IloCplex &cplex_master)
 				   }//system("pause");
 				  else			//If xcolumn in exclude list then check next best xcolumn
 				  {
-					  node_number+=1.0;
+					  node_number+=1;
 					  cout<<koptvals[node_number]<<endl;
 					  //Next kth best
 					  if(node_number<=3)			//Since there are 6 possible xcolumns(hard-coded)
@@ -887,7 +898,7 @@ void solve(IloCplex &cplex_master)
 		}
 }
 
-void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex, IloNumVarArray var)
+void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloNumVarArray var)
 {		
 	/*Load current model(branch) with non-Integer solutions*/
 	/*string left = "left", right="right";
@@ -895,10 +906,14 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex, IloNumVarAr
 	left=left+to_string(static_cast<long long>(ctr))+".lp";
 	right=right+to_string(static_cast<long long>(ctr))+".lp";*/
 	//cout<<left<<endl
-	
-	
+	cplex_master.setParam(IloCplex::EpOpt, 1e-2);
+	cplex_master.setParam(IloCplex::EpAGap, 1e-2);
+	cplex_master.setParam(IloCplex::EpGap, 1e-2);
+	cplex_master.setParam(IloCplex::EpInt, 1e-2);
+	cplex_master.setParam(IloCplex::EpRelax, 1e-2);
 	/*Copy includes and excludes of the previous node*/
-	int xinclude[100],xexclude[100],yinclude[100],yexclude[100],numxexclude,numxinclude,numyexclude,numyinclude;
+	int xexclude[100],yinclude[100],yexclude[100],numxexclude,numxinclude,numyexclude,numyinclude;
+	IloNum xinclude[100];
 	numxexclude=node[nodenum].numxexclude;
 	numxinclude=node[nodenum].numxinclude;
 	numyexclude=node[nodenum].numyexclude;
@@ -999,7 +1014,7 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex, IloNumVarAr
 			break;
 		}
 		if(isY[j]==1)
-			it++;
+			++it;
 	}
 	for(;j<Col_select.getSize();j++)
 	{
@@ -1075,7 +1090,7 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex, IloNumVarAr
 	{
 		mod.push(lb);		//PUSH THE MODEL INTO QUEUE
 		//report1 (cplex_master, Col_select, Constraint_master, Column_index_r, Column_index_j, S, R, M, N);
-		cplex.getValues(vals,var);
+		cplex_master.getValues(vals,var);
 		objVal = cplex_master.getObjValue();
 		//env.out() << "Solution status = " << cplex.getStatus() << endl;
 		env.out() << "Solution value  = " << objVal << endl;
@@ -1091,7 +1106,7 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex, IloNumVarAr
 			if((objVal<incumbent && min_obj ==1) || (objVal>incumbent && min_obj ==0))	//UPDATE INCUMBENT
 			{
 				incumbent = objVal;
-				cplex.getValues(intSol,var);
+				cplex_master.getValues(intSol,var);
 				//env.out()<<vals;
 			}
 		}
@@ -1100,13 +1115,14 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex, IloNumVarAr
 			cout<<"Further branching"<<endl;
 			//system("pause");
 			//return;
-			branch(mod,incumbent,cplex,var);	//FURTHER BRANCHING
+			branch(mod,incumbent,cplex_master,var);	//FURTHER BRANCHING
 		}
 	}	
 	else env.out()<<"Lower Bound Infeasible!"<<endl;
 	//return;
 	cout<<"Result of solution: "<<res<<endl;
-	//system("pause");
+	cout<<"Node: "<<nodenum<<endl;
+	system("pause");
 	/*Branch right->upper bound*/
 	env.out()<<"\nright BRANCHED PROBLEM"<<endl;
 	env.out()<<"-----------------------------------------------------------"<<endl;
@@ -1193,7 +1209,7 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex, IloNumVarAr
 	if(res)		//IS FEASIBLE SOLUTION FOUND
 	{
 		mod.push(ub);
-		cplex.getValues(vals,var);
+		cplex_master.getValues(vals,var);
 		objVal = cplex_master.getObjValue();;
 		//env.out() << "Solution status = " << objVal << endl;
 		env.out() << "Solution value  = " << cplex_master.getObjValue() << endl;
@@ -1208,7 +1224,7 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex, IloNumVarAr
 			if((objVal<incumbent && min_obj ==1) || (objVal>incumbent && min_obj ==0))
 			{
 				incumbent = objVal;
-				cplex.getValues(intSol,var);
+				cplex_master.getValues(intSol,var);
 				//env.out()<<vals;
 			}
 		}
@@ -1216,12 +1232,13 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex, IloNumVarAr
 		{
 			cout<<"Further branching"<<endl;
 			//return;
-			branch(mod,incumbent,cplex,var);
+			branch(mod,incumbent,cplex_master,var);
 		}
 	}
 	else env.out()<<"Upper Bound Infeasible!"<<endl;
 	cout<<"Result of solution: "<<res<<endl;
-	//system("pause");
+	cout<<"Node: "<<nodenum<<endl;
+	system("pause");
 	//ub.remove(con2);
 	//env.out()<<"Incum: "<<incumbent<<endl;
 	return;
@@ -1368,7 +1385,7 @@ static void sort(IloEnv env, Num2DMatrix Unsorted_matrix, Num2DMatrix& Sorted_ar
 {20, 45, 50, 55, 75}
 {48, 35, 24, 10, 8}
 */
-static void gen_cols(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2DMatrix RJ, Num2DMatrix IJ,
+static void gen_cols(Num2DMatrix comb, int S, int R, Int2DMatrix SI, Int2DMatrix RJ, Int2DMatrix IJ,
 	Num2DMatrix flow_des_sort, Num2DMatrix distance_des_sort, Num2DMatrix Col_Matrix)
 {
 	/*First Entry according to heuristic we choose the s,r,m,n corresponding to maximum flow and minimum distance*/
@@ -1379,12 +1396,12 @@ static void gen_cols(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2DMatrix
 	comb[0][4] = flow_des_sort[0][0]; //Assign flow
 	comb[0][5] = distance_des_sort[0][0]; //Assign distance
 	/*Update s,i and r,j  and i,j in these matrices*/
-	SI[0][0] = flow_des_sort[0][1]; //Assign s
-	SI[0][1] = distance_des_sort[0][1]; //Assign m
-	RJ[0][0] = flow_des_sort[0][2]; //Assign r
-	RJ[0][1] = distance_des_sort[0][2]; //Assign n
-	IJ[0][0] = distance_des_sort[0][1]; //Assign m
-	IJ[0][1] = distance_des_sort[0][2]; //Assign n
+	SI[0][0] = (IloInt)flow_des_sort[0][1]; //Assign s
+	SI[0][1] = (IloInt)distance_des_sort[0][1]; //Assign m
+	RJ[0][0] = (IloInt)flow_des_sort[0][2]; //Assign r
+	RJ[0][1] = (IloInt)distance_des_sort[0][2]; //Assign n
+	IJ[0][0] = (IloInt)distance_des_sort[0][1]; //Assign m
+	IJ[0][1] = (IloInt)distance_des_sort[0][2]; //Assign n
 	int num_rj=1, num_si=1, num_ij=1, num_comb=1;
 	//cout<<"\ncomb[0]"<<endl;
 	cout<<comb[0]<<endl;
@@ -1403,7 +1420,7 @@ static void gen_cols(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2DMatrix
 			{
 				j_assigned=1;
 				//cout<<"1>Selected j: "<<RJ[rj][1]<<endl;
-				comb[i][3] = RJ[rj][1]; //Select that j
+				comb[i][3] = (IloNum)RJ[rj][1]; //Select that j
 			}
 			if(j_assigned==1)
 				break;
@@ -1416,7 +1433,7 @@ static void gen_cols(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2DMatrix
 			{
 				i_assigned=1;
 				//cout<<"1>Selected i: "<<SI[si][1]<<endl;
-				comb[i][2] = SI[si][1]; //Select that i
+				comb[i][2] = (IloNum)SI[si][1]; //Select that i
 			}
 			if(i_assigned==1)
 				break;
@@ -1456,10 +1473,10 @@ static void gen_cols(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2DMatrix
 					break;
 				}
 			}
-			RJ[num_rj][0] = comb[i][1];
-			RJ[num_rj][1] = comb[i][3];
-			SI[num_si][0] = comb[i][0];
-			SI[num_si][1] = comb[i][2];
+			RJ[num_rj][0] = (IloInt)comb[i][1];
+			RJ[num_rj][1] = (IloInt)comb[i][3];
+			SI[num_si][0] = (IloInt)comb[i][0];
+			SI[num_si][1] = (IloInt)comb[i][2];
 			//IJ[num_ij][0] = comb[i][2];
 			//IJ[num_ij][1] = comb[i][3];
 			num_rj++;
@@ -1496,8 +1513,8 @@ static void gen_cols(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2DMatrix
 			}
 			//RJ[num_rj][0] = comb[i][1];
 			//RJ[num_rj][1] = comb[i][3];
-			SI[num_si][0] = comb[i][0];
-			SI[num_si][1] = comb[i][2];
+			SI[num_si][0] = (IloInt)comb[i][0];
+			SI[num_si][1] = (IloInt)comb[i][2];
 			//IJ[num_ij][0] = comb[i][2];
 			//IJ[num_ij][1] = comb[i][3];
 			//num_rj++;
@@ -1529,8 +1546,8 @@ static void gen_cols(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2DMatrix
 					break;
 				}
 			}
-			RJ[num_rj][0] = comb[i][1];
-			RJ[num_rj][1] = comb[i][3];
+			RJ[num_rj][0] = (IloInt)comb[i][1];
+			RJ[num_rj][1] = (IloInt)comb[i][3];
 			//SI[num_si][0] = comb[i][0];
 			//SI[num_si][1] = comb[i][2];
 			//IJ[num_ij][0] = comb[i][2];
@@ -1585,7 +1602,7 @@ static void gen_cols(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2DMatrix
 		{
 			if(comb[c][1]==RJ[rj][0] && comb[c][3]==RJ[rj][1])
 			{
-				Col_Matrix[R+comb[c][0]*M+comb[c][2]][rj] = comb[c][4];
+				Col_Matrix[R+(IloInt)comb[c][0]*M+(IloInt)comb[c][2]][rj] = comb[c][4];
 			}
 		}
 	}
@@ -1616,8 +1633,8 @@ static void gen_cols(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2DMatrix
 
 	return;
 }
-
-static void gen_col_matrix(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2DMatrix RJ, Num2DMatrix IJ, 
+/*
+static void gen_col_matrix(Num2DMatrix comb, int S, int R, Int2DMatrix SI, Int2DMatrix RJ, Int2DMatrix IJ, 
 	Num2DMatrix flow_des_sort, Num2DMatrix distance_des_sort, Num2DMatrix Col_Matrix)//Generate Initial Columns Matrix
 {
 		// (ii) Fill S, R & Flow values from flow_des_sort into comb matrix
@@ -1870,11 +1887,11 @@ static void gen_col_matrix(Num2DMatrix comb, int S, int R, Num2DMatrix SI, Num2D
 				}
 				Col_Matrix[R + S*S][R] = 1;
 }
-
+*/
 void generateycolumn(int nodenum, int S, int M, int N, int R, int r, int j, Num2DMatrix dist, IloNumArray reduced_cost_y_column) 
 {
 	cout<<"\nInside y column generation function!"<<endl;
-	int s, m, n, i;
+	int m, n, i;
 	int nr,nc,k;
 	int include[50]={0}; //rth entry will contain 1 or 0 to indicate include y (y=1) or not.
 	int exclude[50][50]={0}; //(r,j) entry will contain global column number if to be exclude or 0.
