@@ -46,11 +46,11 @@ typedef IloArray<IloRangeArray> Range2DMatrix;		//2D Arrays of Ranges
 
 
 #define MAX INT_MAX
-#define RC_EPS 1.0e-2		//if shadow_price or Reduced Cost < RC_EPS, treat it as 0
+#define RC_EPS 1.0e-6		//if shadow_price or Reduced Cost < RC_EPS, treat it as 0
 #define INF (0x7FFFFFFF)
 #define verbose (1)
 #define NUM_SOLUTIONS 100
-#define TOL 0.01			/*define tolerance level to check improving obj value*/
+#define TOL 1.0e-6			/*define tolerance level to check improving obj value*/
 #define LN 99999999.0		/* Large number */
 #define SETSIZE 50
 #define feasibility (RC_EPS*LN)
@@ -153,7 +153,7 @@ int i,s;
 IloModel model_master(env);
 IloNumVarArray Col_select(env);
 IloObjective Col_cost = IloAdd(model_master, IloMinimize(env));
-IloRangeArray  Constraint_master(env);
+IloRangeArray Constraint_master(env);
 IloCplex cplex_master(model_master);
 
 IloModel model_sub_y(env);
@@ -550,22 +550,23 @@ int main(int argc, char **argv)
 	  //system("pause");
 	  
 /*---------------------------------------------SOME INITIAL DECLARATIONS FOR YCOLUMN - END -------------------------------------*/
-		cplex_master.setParam(IloCplex::EpOpt, 1e-2);
-		cplex_master.setParam(IloCplex::EpAGap, 1e-2);
-		cplex_master.setParam(IloCplex::EpGap, 1e-2);
-		cplex_master.setParam(IloCplex::EpInt, 1e-2);
-		cplex_master.setParam(IloCplex::EpRelax, 1e-2);
+		//cplex_master.setParam(IloCplex::EpOpt, 1e-2);
+		//cplex_master.setParam(IloCplex::EpAGap, 1e-2);
+		//cplex_master.setParam(IloCplex::EpGap, 1e-2);
+		//cplex_master.setParam(IloCplex::EpInt, 1e-2);
+		//cplex_master.setParam(IloCplex::EpRelax, 1e-2);
 		//cout<<cplex_master.getParam(IloCplex::EpOpt)<<endl;
 		system("pause");
 		cplex_master.extract(model_master);		//Read master problem
-		solve(cplex_master);				
+		solve(cplex_master);
+		cout<<res<<endl;
 		if(res==0)				//If relaxed master problem is infeasible then original problem is infeasible
 		{
 			cout<<"Problem infeasible!!"<<endl;
 			return 0;
 		}
-
-		cplex_master.exportModel("master.lp");
+		system("pause");
+		//cplex_master.exportModel("master.lp");
 		cplex_master.getValues(vals,Col_select); //Copy values of solution vector
 		cout<<"Solution value: "<<cplex_master.getObjValue()<<endl;
 		cout<<"Solution vector: "<<vals<<endl;
@@ -630,16 +631,19 @@ void solve(IloCplex &cplex_master)
 	res=0;				//If a feasible solution exists then 1 else 0
 	RC_FLAG=1;			//Until atleast 1 x-column or y-column is added RC_FLAG=1 else 0
 	cout<<"Node number: "<<nodenum<<endl;	//Solve called at which node
-	
+	cplex_master.exportModel("model.lp");
+	//cout<<cplex_master.solve()<<endl;
 	//system("pause");
 	while (RC_FLAG)
 	{
 		  RC_FLAG = 0;
 		  /*--------------------------------------OPTIMIZE OVER CURRENT COLUMNS -------------------------------------------------*/
+		  
 		  if(!cplex_master.solve())						//Check infeasibility of solution by cplex
 		  {
 			  res=0;
-			  break;
+			  cout<<"Infeasible"<<endl;
+			  return;
 		  }
 		  else res=1;
 		  //cout<<"check2: "<<res<<endl;
@@ -663,7 +667,7 @@ void solve(IloCplex &cplex_master)
 		 for(int n=0; n<shadow_price.getSize(); n++)
 		 {
 			  node[nodenum].dual[n+1]= shadow_price[n];
-			  printf("\t[%d, %f]\n",n,node[0].dual[n+1]);
+			  printf("\t[%d, %f]\n",n,node[nodenum].dual[n+1]);
 		 }
 		 cout<<'\n';
 		 //cout<<"Solve()::R,N: "<<R<<","<<N<<endl;
@@ -906,11 +910,11 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 	left=left+to_string(static_cast<long long>(ctr))+".lp";
 	right=right+to_string(static_cast<long long>(ctr))+".lp";*/
 	//cout<<left<<endl
-	cplex_master.setParam(IloCplex::EpOpt, 1e-2);
-	cplex_master.setParam(IloCplex::EpAGap, 1e-2);
-	cplex_master.setParam(IloCplex::EpGap, 1e-2);
-	cplex_master.setParam(IloCplex::EpInt, 1e-2);
-	cplex_master.setParam(IloCplex::EpRelax, 1e-2);
+	//cplex_master.setParam(IloCplex::EpOpt, 1e-2);
+	//cplex_master.setParam(IloCplex::EpAGap, 1e-2);
+	//cplex_master.setParam(IloCplex::EpGap, 1e-2);
+	//cplex_master.setParam(IloCplex::EpInt, 1e-2);
+	//cplex_master.setParam(IloCplex::EpRelax, 1e-2);
 	/*Copy includes and excludes of the previous node*/
 	int xexclude[100],yinclude[100],yexclude[100],numxexclude,numxinclude,numyexclude,numyinclude;
 	IloNum xinclude[100];
@@ -934,8 +938,8 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 		return;
 	IloModel model(mod.front());
 	mod.pop();
-	cout<<"Inside branch"<<endl;
-	cout<<"Incumbent: "<<incumbent<<endl;
+	//cout<<"Inside branch"<<endl;
+	//cout<<"Incumbent: "<<incumbent<<endl;
 	//cplex_master.exportModel("master.lp");
 	//system("pause");
 
@@ -968,19 +972,20 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 				break;
 		}
 	}
+	int xcol_curr_node = xcol_check; 
 	value=vals[i];	
 	frac = i;
 	IloNum objVal;
-	cout<<"Branching on col: "<<frac<<" with value: "<<value<<endl;
+	//cout<<"Branching on col: "<<frac<<" with value: "<<value<<endl;
 	//system("pause");
 
 	/*Branch Left->lower bound*/
-	env.out()<<"\nleft BRANCHED PROBLEM"<<endl;
-	env.out()<<"-----------------------------------------------------------"<<endl;
+	//env.out()<<"\nleft BRANCHED PROBLEM"<<endl;
+	//env.out()<<"-----------------------------------------------------------"<<endl;
 
 	IloModel lb(model);	//LOWER BOUND PROBLEM
 	nodenum++;			//NEXT NODE
-	cout<<"Node: "<<nodenum<<endl;
+	//cout<<"Node: "<<nodenum<<endl;
 	//VALUES COPIED FROM PARENT NODE
 	node[nodenum].numxexclude=numxexclude;
 	node[nodenum].numxinclude=numxinclude;
@@ -1027,7 +1032,7 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 	int r1=Column_index_r[frac];		//r of fractional column
 	int j1=Column_index_j[frac];		//j of fractional column
 	//CHECK IF COLUMN BEING BRANCHED ON IS X-COLUMN OR Y-COLUMN
-	cout<<"Ycolumn? "<<isY[frac]<<endl;
+	//cout<<"Ycolumn? "<<isY[frac]<<endl;
 	if(isY[frac]==1)
 	{				
 		node[nodenum].yexclude[node[nodenum].numyexclude]=frac;
@@ -1039,17 +1044,31 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 		node[nodenum].xexclude[node[nodenum].numxexclude]=xcol_check;
 		node[nodenum].numxexclude++;
 	}
-	//DEBUG
+	solve(cplex_master);
+
 	cout<<"Excluded x List:-"<<endl;
+	int c=-1;
 	for(int j=0;j<node[nodenum].numxexclude;j++)
 	{
-		cout<<node[nodenum].xexclude[j]<<" ";
+		cout<<"Index: "<<node[nodenum].xexclude[j]<<" ";
+		c=j;
+	}
+	if(c!=-1)
+	{
+		cout<<"Last excluded Column:"<<endl;
+		for(int j=0;j<xcolumns_val.getSize();j++)
+		{
+			cout<<xcol[node[nodenum].xexclude[c]][j]<<": ";					
+		}
 	}
 	cout<<endl;
 	cout<<"Included x List:-"<<endl;
-	for(int j=0;j<node[nodenum].numxinclude;j++)
+	if(node[nodenum].is_xincluded==1)
 	{
-		cout<<node[nodenum].xinclude[j]<<" ";
+		for(int j=0;j<R+S*M+1;j++)
+		{
+			cout<<node[nodenum].xinclude[j]<<" ";
+		}
 	}
 	cout<<endl;
 	cout<<"Excluded y List:-"<<endl;
@@ -1066,7 +1085,7 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 	cout<<endl;
 	//system("pause");
 	//return;
-	solve(cplex_master);
+	
 	//Debug
 	/*cout<<"Y-column? : "<<isY[i]<<endl;
 	cout<<"Non-integral value: "<<value<<endl;
@@ -1083,9 +1102,12 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 		cout<<endl;
 	}*/
 	//cout<<"planid: "<<Column_index_plan[i]<<endl;
+	
 	cplex_master.exportModel("lb.lp");
 	//system("pause");
-
+	cout<<"---------------------SUMMARY OF NODE "<<nodenum<<"(Left)---------------------"<<endl;
+	cout<<"Incumbent solution: "<<incumbent<<endl;
+	cout<<"Branching on col: "<<frac<<" with value: "<<value<<endl;
 	if(res)	//IF FEASIBLE SOLUTION FOUND
 	{
 		mod.push(lb);		//PUSH THE MODEL INTO QUEUE
@@ -1113,23 +1135,25 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 		else if((objVal<incumbent && min_obj ==1) || (objVal>incumbent && min_obj ==0))	//IS IT REQUIRED TO BRANCH
 		{
 			cout<<"Further branching"<<endl;
-			//system("pause");
+			system("pause");
 			//return;
 			branch(mod,incumbent,cplex_master,var);	//FURTHER BRANCHING
 		}
 	}	
 	else env.out()<<"Lower Bound Infeasible!"<<endl;
 	//return;
-	cout<<"Result of solution: "<<res<<endl;
-	cout<<"Node: "<<nodenum<<endl;
+	//cout<<"Result of solution: "<<res<<endl;
+	//cout<<"Node: "<<nodenum<<endl;
 	system("pause");
 	/*Branch right->upper bound*/
-	env.out()<<"\nright BRANCHED PROBLEM"<<endl;
-	env.out()<<"-----------------------------------------------------------"<<endl;
+	//env.out()<<"\nright BRANCHED PROBLEM"<<endl;
+	//env.out()<<"-----------------------------------------------------------"<<endl;
 
 	IloModel ub(model);	//UPPER BOUND PROBLEM
 	nodenum++;		//NEXT NODE
-	cout<<"Node: "<<nodenum<<endl;
+	//cout<<"Node: "<<nodenum<<endl;
+	
+	xcol_check = xcol_curr_node;		//Since xcol_check is a global variable and it may hold value from different node.
 	//VALUES COPIED FROM PARENT NODE
 	node[nodenum].numxexclude=numxexclude;
 	node[nodenum].numxinclude=numxinclude;
@@ -1157,7 +1181,7 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 	}
 	cplex_master.getObjective().setExpr(objexpr);
 	//cplex_master.exportModel("rit.lp");
-	cout<<"Is Y col? "<<isY[frac]<<endl;
+	//cout<<"Is Y col? "<<isY[frac]<<endl;
 	if(isY[frac]==1)
 	{
 		node[nodenum].yinclude[node[nodenum].numyinclude]=frac;
@@ -1165,7 +1189,7 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 	}
 	else
 	{
-		for(int j=0;j<R+S*M+1;j++)		//HARDCODED NUMBER OF ROWS IN COLUMN
+		for(int j=0;j<R+S*M+1;j++)		
 		{
 			node[nodenum].xinclude[j]=xcol[xcol_check][j];
 		}
@@ -1174,17 +1198,30 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 		node[nodenum].is_xincluded=1;
 		iter=1;
 	}
-	//DEBUG
+	solve(cplex_master);
 	cout<<"Excluded x List:-"<<endl;
+	c=-1;
 	for(int j=0;j<node[nodenum].numxexclude;j++)
 	{
 		cout<<node[nodenum].xexclude[j]<<" ";
+		c=j;
+	}
+	cout<<"Last excluded Column:"<<endl;
+	if(c!=-1)
+	{
+		for(int j=0;j<xcolumns_val.getSize();j++)
+		{
+			cout<<xcol[node[nodenum].xexclude[c]][j]<<": ";					
+		}
 	}
 	cout<<endl;
 	cout<<"Included x List:-"<<endl;
-	for(int j=0;j<node[nodenum].numxinclude;j++)
+	if(node[nodenum].is_xincluded==1)
 	{
-		cout<<node[nodenum].xinclude[j]<<" ";
+		for(int j=0;j<R+S*M+1;j++)
+		{
+			cout<<node[nodenum].xinclude[j]<<" ";
+		}
 	}
 	cout<<endl;
 	cout<<"Excluded y List:-"<<endl;
@@ -1201,11 +1238,13 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 	cout<<endl;
 	//system("pause");
 	
-	solve(cplex_master);
+	//solve(cplex_master);
 
 	cplex_master.exportModel("ub.lp");
 	//system("pause");
-	
+	cout<<"---------------------SUMMARY OF NODE "<<nodenum<<"(Right)---------------------"<<endl;
+	cout<<"Incumbent solution: "<<incumbent<<endl;
+	cout<<"Branching on col: "<<frac<<" with value: "<<value<<endl;
 	if(res)		//IS FEASIBLE SOLUTION FOUND
 	{
 		mod.push(ub);
@@ -1231,13 +1270,13 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 		else if((objVal<=incumbent && min_obj ==1) || (objVal>=incumbent && min_obj ==0))
 		{
 			cout<<"Further branching"<<endl;
-			//return;
+			system("pause");
 			branch(mod,incumbent,cplex_master,var);
 		}
 	}
 	else env.out()<<"Upper Bound Infeasible!"<<endl;
-	cout<<"Result of solution: "<<res<<endl;
-	cout<<"Node: "<<nodenum<<endl;
+	//cout<<"Result of solution: "<<res<<endl;
+	//cout<<"Node: "<<nodenum<<endl;
 	system("pause");
 	//ub.remove(con2);
 	//env.out()<<"Incum: "<<incumbent<<endl;
@@ -2247,21 +2286,22 @@ int setpartition(int setnum,int nr, int nc)
                   }
 		// printf("]\n ");
    return bestindex;
-   }
+}
+
 void cleanspace()
 {
-int i,j, k;
-for (i=0; i < SETSIZE; i++)
+	int i,j, k;
+	for (i=0; i < SETSIZE; i++)
 	{
 		set[i].z=0;
 		set[i].status=0;
-	for (j=0; j < 50; j ++)
-        	{
+		for (j=0; j < 50; j ++)
+        {
 			set[i].assignment[j]=0;
 			for(k=0; k<100 ; k++)
-                		 {
+			{
 				set[i].a[k][j]=0.0;
-                 		}
+			}
 		}
 	}
 }
