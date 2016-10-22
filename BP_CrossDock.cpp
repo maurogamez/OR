@@ -1,4 +1,4 @@
-/*Hardcoded: S,R,M,N, node_number*/
+/*Hardcoded: S,R,M,N, node_number; numycolumns=node[nodenum].numyinclude changed, impact unknown*/
 /*Branch and Price for cross Dock problem*/
 
 //STANDARD C++ LIBRARIES
@@ -141,13 +141,13 @@ double ycolumns_semiassignment[30][30];
 int basissize, numycolumns, numnodegen, numnodeactive;
 double upperbound, lowerbound;
 
-/*
-const int S=4;	//STORES TOTAL NUMBER OF SUPPLIERS
-const int R=3;	//STORES TOTAL NUMBER OF RETAILERS
-const int N=3;	//STORES TOTAL NUMBER OF OUTBOUND DOORS
-const int M=4;	//STORES TOTAL NUMBER OF INBOUND DOORS
-*/
-int S=3, R=2, M=3, N=2;
+
+int S;//=4;	//STORES TOTAL NUMBER OF SUPPLIERS
+int R;//=3;	//STORES TOTAL NUMBER OF RETAILERS
+int N;//=3;	//STORES TOTAL NUMBER OF OUTBOUND DOORS
+int M;//=4;	//STORES TOTAL NUMBER OF INBOUND DOORS
+
+//int S=3, R=2, M=3, N=2;
 int i,s;
 
 IloModel model_master(env);
@@ -205,6 +205,7 @@ Num2DMatrix dist(env);
 void generateycolumn(int nodenum, int S, int M, int N, int R, int r, int j, Num2DMatrix dist, IloNumArray reduced_cost_y_column); //generate y column by solving assignment subproblem 1. This is only a definition.
 void branch(queue<IloModel> mod, IloNum &incumbent,IloCplex &cplex, IloNumVarArray vars);	//This function creates branching at each node
 void solve(IloCplex &cplex_master); //res=1 implies solution obtained whereas res=0 implies infeasible
+bool areElementsInteger(IloNumArray val);	//An alternate user defined function for integrality test
 //This is the custom solve function that implements the column generation
 
 using namespace::std;
@@ -225,10 +226,10 @@ int main(int argc, char **argv)
 		cout<<flow<<endl;
 		cout<<dist<<endl;
 		//S=4;
-		/*S = 4;//flow.getSize();
-		R = 3;//flow[0].getSize();
-		M = 4;//dist.getSize();
-		N = 3;//dist[0].getSize();*/
+		S = flow.getSize();
+		R = flow[0].getSize();
+		M = dist.getSize();
+		N = dist[0].getSize();
 
 		cout<<"No. of Sources = "<<S<<endl;
 		cout<<"No. of Destinations = "<<R<<endl;
@@ -577,7 +578,8 @@ int main(int argc, char **argv)
 		/*------------------------------------------------------Branch and bound-----------------------------------------------------*/
 		system("pause");
 			
-		if(vals.areElementsInteger())				//Are the values in the solution vector integral
+		//if(vals.areElementsInteger())				//Are the values in the solution vector integral
+		if(areElementsInteger(vals))
 		{
 			env.out()<<"Relaxed LP gives integral solution"<<endl;
 			env.out()<<"\n\nFinal incumbent solution: "<<cplex_master.getObjValue()<<endl;
@@ -630,7 +632,7 @@ void solve(IloCplex &cplex_master)
 {
 	res=0;				//If a feasible solution exists then 1 else 0
 	RC_FLAG=1;			//Until atleast 1 x-column or y-column is added RC_FLAG=1 else 0
-	cout<<"Node number: "<<nodenum<<endl;	//Solve called at which node
+	cout<<"Node number for solve functn: "<<nodenum<<endl;	//Solve called at which node
 	cplex_master.exportModel("model.lp");
 	//cout<<cplex_master.solve()<<endl;
 	//system("pause");
@@ -663,13 +665,13 @@ void solve(IloCplex &cplex_master)
 		  
 		  /// FIND AND ADD A NEW Y COLUMN WITH NEGATIVE REDUCED COST ///
 		  // 1. Read shadow prices
-		 cout<<"Reading shadow prices!"<<endl;
+		 //cout<<"Reading shadow prices!"<<endl;
 		 for(int n=0; n<shadow_price.getSize(); n++)
 		 {
 			  node[nodenum].dual[n+1]= shadow_price[n];
-			  printf("\t[%d, %f]\n",n,node[nodenum].dual[n+1]);
+			  //printf("\t[%d, %f]\n",n,node[nodenum].dual[n+1]);
 		 }
-		 cout<<'\n';
+		 //cout<<'\n';
 		 //cout<<"Solve()::R,N: "<<R<<","<<N<<endl;
 		 //system("pause");
 
@@ -683,9 +685,9 @@ void solve(IloCplex &cplex_master)
 					  reduced_cost_y_column[i] = 0;
 				  }
 
-				  numycolumns = 0; // For now hard code this value; otherwise this should come from the code depending upon how many columns 
+				  numycolumns = node[nodenum].numyinclude;//0; // For now hard code this value; otherwise this should come from the code depending upon how many columns 
 					               // have previously been added, and increment this value as and when a ycolumn is added
-
+				  cout<<"Numycolumns: "<<numycolumns<<endl;
 /*------------------------------------------------------EXPERIMENTS HERE-----------------------------------------------------------------------------------------------*/
 				  //if(nodenum==0)
 				  //{		//For testing x-gen.....remove later
@@ -712,13 +714,13 @@ void solve(IloCplex &cplex_master)
 					}
 				  
 					IloNum current_sub_red_cost = -reduced_cost_y_column[y_node_output+1];;
-					cout<<'\n'<<'\n'<<"y_sub_problem_objective value: "<<current_sub_red_cost<<'\n';
+					//cout<<'\n'<<'\n'<<"y_sub_problem_objective value: "<<current_sub_red_cost<<'\n';
 					//system("pause");
 					if (current_sub_red_cost< -RC_EPS)
 					{
 						IloNum Col_cost_val = ycolumns_semiassignment[0][y_node_output+1];
-		  				cout<<"new_y_Col_val "<<ycolumns_val<<'\n';
-						cout<<"Cost of the new Column: "<<Col_cost_val<<endl;
+		  				//cout<<"new_y_Col_val "<<ycolumns_val<<'\n';
+						//cout<<"Cost of the new Column: "<<Col_cost_val<<endl;
 						RC_FLAG = 1;
 	 					cout<<'\n'<<"RC_FLAG is 1 because there is a new y-column for r="<<r+1<<" and j="<<j+1<<'\n'<<'\n';
 						//system("pause");
@@ -741,6 +743,8 @@ void solve(IloCplex &cplex_master)
 				  ycolumns_val[r] = 0;//Change it back to 0 by default. Will be changed to 1 for r inside the loop
 			  }//for(int j=0; j<Num_odoors; j++) - endy
 		 }//for (int r=0; r<Num_destination; r++)
+		 if(nodenum>=1)
+			 system("pause");
 		  cout<<"Solving X column generation problem "<<endl;
 		  //cout<<"S,M,N,R: "<<S<<":"<<M<<":"<<N<<":"<<R<<endl;
 		  //system("pause");
@@ -766,9 +770,9 @@ void solve(IloCplex &cplex_master)
 			  // 2. Call Miller function
 
 			  Millers_Code(S, R, kbestsols, koptvals, shadow_price);
-			  cout<<'\n'<<"Objective function from assignment problem: "<<koptvals[node_number]<<'\n';
+			  //cout<<'\n'<<"Objective function from assignment problem: "<<koptvals[node_number]<<'\n';
 			  koptvals[node_number] += -shadow_price[shadow_price.getSize()-1];//shadow price of last constraint (w)
-			  cout<<'\n'<<"Final reduced cost of x sub-problem: "<<koptvals[node_number]<<'\n';
+			  //cout<<'\n'<<"Final reduced cost of x sub-problem: "<<koptvals[node_number]<<'\n';
 			  k_best:								//label k_best used by goto below		  
 			  //system("pause");
 			  /* Consider root node only*/
@@ -788,14 +792,15 @@ void solve(IloCplex &cplex_master)
 			  }
 		  
 			  xcolumns_val[xcolumns_val.getSize()-1] = 1;//Last element in y column is always 0 for y column (1 for x column)
-			  cout<<"newCol_x_val "<<xcolumns_val<<endl;
+			  //cout<<"newCol_x_val "<<xcolumns_val<<endl;
 			  //cout<<"newCol_x_val "<<newCol_x_val<<endl;
 			  //report2 (cplex_sub_x, xcolumns_val,  Objective_sub_x);
 			  ////system("pause");
-			  cout<<"xcol_check: "<<xcol_check<<endl;
+			  //cout<<"xcol_check: "<<xcol_check<<endl;
 			  /*for(int i=0;i<xcolumns_val.getSize();i++)
 				cout<<xcolumns[xcol_check][i]<<" ";
-			  */cout<<endl;
+			  */
+			  //cout<<endl;
 			  //system("pause");
 			  //Col_select.remove(IloNumVar(Col_cost(0) + Constraint_master(xcolumns[xcol_check])));
 			  /*int is_excl=1;
@@ -842,7 +847,7 @@ void solve(IloCplex &cplex_master)
 				  if(dummy==1)
 				  {
 					RC_FLAG = 1;
-					cout<<"Storing xcolumns!"<<endl;
+					//cout<<"Storing xcolumns!"<<endl;
 					//cout<<xcol_ctr<<":"<<xcolumns_val.getSize()<<endl;
 					for(int j=0;j<xcolumns_val.getSize();j++)
 					{
@@ -891,13 +896,14 @@ void solve(IloCplex &cplex_master)
 			  }*/
 		  }//if(node[nodenum].xincluded==0)
 		  //cout<<S<<":"<<M<<":"<<N<<":"<<R<<endl;
-		  //system("pause");
+		  if(nodenum>=1)
+			 system("pause");
 	  }//while (RC_FLAG)
 		if(cplex_master.getObjValue()>=feasibility)		//Check infeasibility if the solution is a large number meaning a column could not be made 0
 		{
 			res=0;
 			//break;
-			cout<<"Big value!"<<endl;
+			cout<<"Infeasible as column could not be made 0. Big value!"<<endl;
 			system("pause");
 		}
 }
@@ -1123,7 +1129,8 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 		cout<<endl;
 		//system("pause");
 		//return ;	
-		if(vals.areElementsInteger())	//ARE ALL VALUES INTEGER
+		//if(vals.areElementsInteger())	//ARE ALL VALUES INTEGER
+		if(areElementsInteger(vals))
 		{
 			if((objVal<incumbent && min_obj ==1) || (objVal>incumbent && min_obj ==0))	//UPDATE INCUMBENT
 			{
@@ -1258,7 +1265,8 @@ void branch(queue<IloModel> mod, IloNum &incumbent, IloCplex& cplex_master, IloN
 			cout<<isY[j]<<" ";
 		cout<<endl;
 		//system("pause");
-		if(vals.areElementsInteger())
+		//if(vals.areElementsInteger())
+		if(areElementsInteger(vals))
 		{
 			if((objVal<incumbent && min_obj ==1) || (objVal>incumbent && min_obj ==0))
 			{
@@ -1929,7 +1937,7 @@ static void gen_col_matrix(Num2DMatrix comb, int S, int R, Int2DMatrix SI, Int2D
 */
 void generateycolumn(int nodenum, int S, int M, int N, int R, int r, int j, Num2DMatrix dist, IloNumArray reduced_cost_y_column) 
 {
-	cout<<"\nInside y column generation function!"<<endl;
+	//cout<<"\nInside y column generation function!"<<endl;
 	int m, n, i;
 	int nr,nc,k;
 	int include[50]={0}; //rth entry will contain 1 or 0 to indicate include y (y=1) or not.
@@ -1948,7 +1956,7 @@ void generateycolumn(int nodenum, int S, int M, int N, int R, int r, int j, Num2
 		//cout<<node[nodenum].yinclude[i]<<endl;
 		//cout<<"r: "<<yheader[node[nodenum].yinclude[i]].r<<endl;
 		include[yheader[node[nodenum].yinclude[i]].r+1] = 1; //make rth entry 1  to indicate include y(r)
-		printf("\n INCLUDE, r= %d\n", yheader[node[nodenum].yinclude[i]].r);
+		//printf("\n INCLUDE, r= %d\n", yheader[node[nodenum].yinclude[i]].r);
 	}
 	
 	
@@ -2035,7 +2043,7 @@ void generateycolumn(int nodenum, int S, int M, int N, int R, int r, int j, Num2
 			{
 					//improving column is found
 				int overlap=0, checkex;
-				cout<<node[nodenum].numyexclude<<endl;
+				//cout<<node[nodenum].numyexclude<<endl;
 				//system("pause");
 				for(checkex=1; checkex <= node[nodenum].numyexclude && overlap==0; checkex++)
 				{
@@ -2057,7 +2065,7 @@ void generateycolumn(int nodenum, int S, int M, int N, int R, int r, int j, Num2
 								overlap=0; //no overlap
 							}
 						}
-						printf("\n[overlap=%d for,r=%d, j=%d,plan=%d\n",overlap,r1,j1,plan1);
+						//printf("\n[overlap=%d for,r=%d, j=%d,plan=%d\n",overlap,r1,j1,plan1);
 					}
 				}
 				//cout<<"overlap: "<<overlap<<endl;
@@ -2066,7 +2074,7 @@ void generateycolumn(int nodenum, int S, int M, int N, int R, int r, int j, Num2
 					//no overlap found with exclude list
 					found=1;
 					//generate column and put in RMP
-					printf("\n Print Column, basissize=%d \n",basissize);	
+					//printf("\n Print Column, basissize=%d \n",basissize);	
 					numycolumns++;
 					reduced_cost_y_column[numycolumns] = costofcolumn;
 								
@@ -2075,7 +2083,7 @@ void generateycolumn(int nodenum, int S, int M, int N, int R, int r, int j, Num2
 					yheader[numycolumns].r=r;
 					yheader[numycolumns].j=n;
 					yheader[numycolumns].planid=yassignment[r][n].nofplans;
-					printf("\n[r=%d,j=%d, plan=%d,costAss=%f,cost=%f ", r,n,yassignment[r][n].nofplans,set[q].z,costofcolumn);
+					//printf("\n[r=%d,j=%d, plan=%d,costAss=%f,cost=%f ", r,n,yassignment[r][n].nofplans,set[q].z,costofcolumn);
 					double objvalue=0.0;
 					objvalue=0.0;
 					for(int t=1; t <= basissize ; t++)
@@ -2084,12 +2092,12 @@ void generateycolumn(int nodenum, int S, int M, int N, int R, int r, int j, Num2
 					}
 								
 					ycolumns_semiassignment[r][numycolumns]=1.0;
-					printf("\nassignment=[");
+					//printf("\nassignment=[");
 								
 					for(int t1=1; t1 <= flowretailer[r].numsuppliers;t1++)
 					{
 						yassignment[r][n].assignment[yassignment[r][n].nofplans][t1]=ksolutions[k].assignment[t1];
-						printf(" \n ksolutions[k].assignment[t1]%d ", ksolutions[k].assignment[t1]);
+						//printf(" \n ksolutions[k].assignment[t1]%d ", ksolutions[k].assignment[t1]);
 						int row=R+(flowretailer[r].supplierids[t1]-1)*S+ksolutions[k].assignment[t1];
 						//cout<<'\n'<<'\n'<<"So far so good"<<'\n';
 						////system("pause");
@@ -2099,13 +2107,13 @@ void generateycolumn(int nodenum, int S, int M, int N, int R, int r, int j, Num2
 					//cout<<"Numycolumns: "<<numycolumns<<endl;			
 					ycolumns_semiassignment[0][numycolumns]=objvalue;
 					//printf("\n[row 0,%f for column=%d]", ycolumns[0][numycolumns],numycolumns);
-					printf("\n%f", ycolumns_semiassignment[0][numycolumns]);
-					cout<<"\nFinal ycolumn: "<<endl; 
-					for(int t=1; t <= basissize ; t++)
+					//printf("\n%f", ycolumns_semiassignment[0][numycolumns]);
+					//cout<<"\nFinal ycolumn: "<<endl; 
+					/*for(int t=1; t <= basissize ; t++)
 					{
 						//printf("\n[%d,%f]", t,ycolumns[t][numycolumns]);
 						printf("\n%f", ycolumns_semiassignment[t][numycolumns]); // Final ycolumn
-					}
+					}*/
 					//system("pause");
              				
 					//**********************************************************************************************	
@@ -2304,4 +2312,14 @@ void cleanspace()
 			}
 		}
 	}
+}
+
+bool areElementsInteger(IloNumArray val)
+{
+	for(int i=0;i<val.getSize();i++)
+	{
+		if(abs(vals[i])-floor(abs(vals[i]))>=TOL)
+			return false;
+	}
+	return true;
 }
